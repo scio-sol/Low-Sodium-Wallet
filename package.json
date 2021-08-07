@@ -1,0 +1,17 @@
+{
+  "name": "low-sodium-wallet",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "test": "npx hardhat test"
+  },
+  "author": "scio",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.2",
+    "dotenv": "^10.0.0"
+  },
+  "devDependencies": {
+    "hardhat": "^2.6.0"
+  }
+}
