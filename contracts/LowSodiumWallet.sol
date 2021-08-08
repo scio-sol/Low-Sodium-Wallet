@@ -6,6 +6,13 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract LowSodiumWallet {
 
+    /**
+        Three 32-bytes chunks per transaction.
+    
+        A contract address of 0x0 is interpreted as "Ethereum".
+        Amount is always in lowest-denomination of the token that we are dealing with.
+        Destination is the new owner.
+     */
     struct PendingTransaction {
         address contractAddress;
         uint64 maturity;
@@ -14,14 +21,16 @@ contract LowSodiumWallet {
         address destination;
     }
 
-    mapping ( address => bool ) blackList;
+    // A blacklist of malicious addresses. Causes reversion of new transactions (but existing ones are fine)
+    mapping ( address => bool ) private blackList;
 
-    mapping ( uint => PendingTransaction ) pendingTransactions;
-    mapping ( address => uint256 ) reserved;
 
-    uint256 nonce;
-    uint64 immutable delay;
-    address immutable owner;
+    mapping ( uint => PendingTransaction ) private pendingTransactions;
+    mapping ( address => uint256 ) private reserved;
+
+    uint256 private nonce;
+    uint64 immutable private delay;
+    address immutable private owner;
 
     constructor(uint64 _delay, address _owner) {
         nonce = 0;
@@ -99,6 +108,20 @@ contract LowSodiumWallet {
             IERC20(pt.contractAddress).transfer(pt.destination, pt.amount);
         }
 
+    }
+
+    function addToBlacklist(address addr) external {
+        require(msg.sender == owner);
+
+        blackList[addr] = true;
+        
+    }
+
+    function removeFromBlacklist(address addr) external {
+        require(msg.sender == owner);
+
+        delete(blackList[addr]);
+        
     }
     
 }
