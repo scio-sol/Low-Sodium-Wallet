@@ -9,6 +9,7 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
+    "@openzeppelin/contracts": "^4.2.0",
     "dotenv": "^10.0.0"
   },
   "devDependencies": {
