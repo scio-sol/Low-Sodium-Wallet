@@ -26,16 +26,15 @@ contract LowSodiumWallet {
         Destination is the new owner.
      */
     struct PendingTransaction {
-        address contractAddress;
-        uint96 maturity;
 
-        address destination;
         uint96 ID;
+        address contractAddress;
+        
+        uint96 maturity;
+        address destination;
+
         uint256 amount;  
     }
-
-
-
 
     // A map of ID->Tx.
     mapping ( uint96 => PendingTransaction ) private pendingTransactions;
@@ -63,11 +62,22 @@ contract LowSodiumWallet {
 
 
 
+    event LSW_Created(address _owner);
+    event  LSW_Transaction_Created(address _owner, uint96 _ID, address _token, uint96 _maturity, address _destination, uint256 _amount);
+    event LSW_Transaction_Modified(address _owner, uint96 _ID, address _token, uint96 _maturity, address _destination, uint256 _amount);
+    event LSW_Transaction_Canceled(address _owner, uint96 _ID, address _token, uint96 _maturity, address _destination, uint256 _amount);
+    event LSW_Transaction_Finished(address _owner, uint96 _ID, address _token, uint96 _maturity, address _destination, uint256 _amount);
+
+
+
+
     constructor(uint96 _delay) {
 
         nonce = 0; // The first tx is #1 because the nonce pre-increments
         delay = _delay;
         owner = msg.sender;
+
+        emit LSW_Created(msg.sender);
 
     }
 
@@ -87,7 +97,7 @@ contract LowSodiumWallet {
 
         // This block checks for available funds
         if(_contractAddress == address(0)) {
-            require(address(this).balance >= _amount + reserved[address(0)]);  // Eth
+            require(address(this).balance >= _amount + reserved[address(0)]);  // Ether
         } else {
             require(IERC20(_contractAddress).balanceOf(address(this)) >= _amount + reserved[_contractAddress]); // ERC20-compatible token
         }
@@ -106,6 +116,8 @@ contract LowSodiumWallet {
         pendingTransactions[nonce] = pt;
         reserved[_contractAddress] += _amount;
 
+        emit LSW_Transaction_Created(msg.sender, pt.ID, pt.contractAddress, pt.maturity, pt.destination, pt.amount);
+
         return nonce;
 
     }
@@ -123,10 +135,14 @@ contract LowSodiumWallet {
         // Do not send money to itself
         require(_destination != address(this));
 
+        PendingTransaction memory pt = pendingTransactions[_txId];
+
         // Check the timestamp. If id is not correct, maturity will be = 0 and it will revert.
-        require(pendingTransactions[_txId].maturity > block.timestamp + delay/2);
+        require(pt.maturity > block.timestamp + delay/2);
 
         pendingTransactions[_txId].destination = _destination;
+
+        emit LSW_Transaction_Modified(msg.sender, pt.ID, pt.contractAddress, pt.maturity, _destination, pt.amount);
 
     }
 
@@ -144,6 +160,8 @@ contract LowSodiumWallet {
 
         reserved[pt.contractAddress] -= pt.amount;
         delete(pendingTransactions[_txId]);
+
+        emit LSW_Transaction_Canceled(msg.sender, pt.ID, pt.contractAddress, pt.maturity, pt.destination, pt.amount);
 
     }
 
@@ -171,8 +189,8 @@ contract LowSodiumWallet {
             IERC20(pt.contractAddress).transfer(pt.destination, pt.amount);
         }
 
-    }
+        emit LSW_Transaction_Finished(msg.sender, pt.ID, pt.contractAddress, pt.maturity, pt.destination, pt.amount);
 
-    // TODO events.
+    }
     
 }
