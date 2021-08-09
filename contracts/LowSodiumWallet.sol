@@ -62,11 +62,10 @@ contract LowSodiumWallet {
 
 
 
-    event LSW_Created(address _owner);
-    event  LSW_Transaction_Created(address _owner, uint96 _ID, address _token, uint96 _maturity, address _destination, uint256 _amount);
-    event LSW_Transaction_Modified(address _owner, uint96 _ID, address _token, uint96 _maturity, address _destination, uint256 _amount);
-    event LSW_Transaction_Canceled(address _owner, uint96 _ID, address _token, uint96 _maturity, address _destination, uint256 _amount);
-    event LSW_Transaction_Finished(address _owner, uint96 _ID, address _token, uint96 _maturity, address _destination, uint256 _amount);
+    event  LSW_Transaction_Created(address owner, uint96 ID, address token, uint96 maturity, uint256 amount, address destination);
+    event LSW_Transaction_Modified(address owner, uint96 ID, address token, uint96 maturity, uint256 amount, address destination);
+    event LSW_Transaction_Canceled(address owner, uint96 ID, address token, uint96 maturity, uint256 amount, address destination);
+    event LSW_Transaction_Finished(address owner, uint96 ID, address token, uint96 maturity, uint256 amount, address destination);
 
 
 
@@ -77,8 +76,6 @@ contract LowSodiumWallet {
         delay = _delay;
         owner = msg.sender;
 
-        emit LSW_Created(msg.sender);
-
     }
 
 
@@ -88,7 +85,7 @@ contract LowSodiumWallet {
         Register the pending tx if everything is alright.
 
      */
-    function orderTransaction(address _contractAddress, uint256 _amount, address _destination) external returns (uint96) {
+    function orderTransaction(address _contractAddress, uint256 _amount, address _destination) external {
 
         require(msg.sender == owner);
 
@@ -116,9 +113,7 @@ contract LowSodiumWallet {
         pendingTransactions[nonce] = pt;
         reserved[_contractAddress] += _amount;
 
-        emit LSW_Transaction_Created(msg.sender, pt.ID, pt.contractAddress, pt.maturity, pt.destination, pt.amount);
-
-        return nonce;
+        emit LSW_Transaction_Created(msg.sender, pt.ID, pt.contractAddress, pt.maturity, pt.amount, pt.destination);
 
     }
 
@@ -142,7 +137,7 @@ contract LowSodiumWallet {
 
         pendingTransactions[_txId].destination = _destination;
 
-        emit LSW_Transaction_Modified(msg.sender, pt.ID, pt.contractAddress, pt.maturity, _destination, pt.amount);
+        emit LSW_Transaction_Modified(msg.sender, pt.ID, pt.contractAddress, pt.maturity, pt.amount, _destination);
 
     }
 
@@ -161,7 +156,7 @@ contract LowSodiumWallet {
         reserved[pt.contractAddress] -= pt.amount;
         delete(pendingTransactions[_txId]);
 
-        emit LSW_Transaction_Canceled(msg.sender, pt.ID, pt.contractAddress, pt.maturity, pt.destination, pt.amount);
+        emit LSW_Transaction_Canceled(msg.sender, pt.ID, pt.contractAddress, pt.maturity, pt.amount, pt.destination);
 
     }
 
@@ -189,8 +184,11 @@ contract LowSodiumWallet {
             IERC20(pt.contractAddress).transfer(pt.destination, pt.amount);
         }
 
-        emit LSW_Transaction_Finished(msg.sender, pt.ID, pt.contractAddress, pt.maturity, pt.destination, pt.amount);
+        emit LSW_Transaction_Finished(msg.sender, pt.ID, pt.contractAddress, pt.maturity, pt.amount, pt.destination);
 
     }
+
+    receive() external payable {}
+    fallback() external payable {}
     
 }
