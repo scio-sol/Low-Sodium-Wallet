@@ -4,6 +4,18 @@ pragma solidity ^0.8.6;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+
+/**
+    The ultimate goal here is to make this resistant to attacks even by someone that has figured out
+    your private key.
+
+    We want:
+    a) No surprises. No attacks that are done and finished and irreversible in a small amount of time.
+    b) Time to ask for help and consult with an expert.
+    c) Ideally, an (offchain) system to notify the owner of any change. An attacker would need to attack this
+        first.
+    
+ */
 contract LowSodiumWallet {
 
     /**
@@ -32,11 +44,12 @@ contract LowSodiumWallet {
     mapping ( address => uint256 ) private reserved;
 
     /**
-        Simplest counter. Why is it a uint96? Struct packing.
+        Simplest counter. Why is it an uint96? Struct packing.
 
         You can only perform 79228 trillion trillion transactions with this wallet, 
-        and after that your money will be locked down forever. Please do less than 
-        three trillion trillion transactions a day or it will run out in 72 years.
+        and after that your money will be locked down forever. If you do less than 
+        three trillion trillion transactions a day, it will not run out in at least
+        ~72 years.
 
         Why do I put the ID into the struct? Good qwestion, I don't know.
      */
@@ -147,9 +160,11 @@ contract LowSodiumWallet {
         reserved[pt.contractAddress] -= pt.amount;
         delete(pendingTransactions[_txId]);
 
-        // Execution. Does not check for funds or specific conditions,
-        // so wierd ERC20s could make this fail. Imagine a contract that burns tokens
-        // everyday, or one that does not let you withdraw (ever).
+        /**
+            Execution. Does not check for funds or specific conditions,
+            so wierd ERC20s could make this fail. Imagine a contract that burns tokens
+            everyday, or one that does not let you withdraw (ever).
+        */
         if(pt.contractAddress == address(0)) {
             payable(pt.destination).transfer(pt.amount);
         } else {

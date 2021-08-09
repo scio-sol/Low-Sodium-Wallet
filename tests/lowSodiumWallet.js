@@ -2,11 +2,11 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("Low Sodium Wallet - Unit Tests", async function() {
-    const factory, owner, bobby, alice, addrs, contract;
+    const factory, owner, bobby, alice, james, addrs, contract;
 
     this.beforeAll(async function() {
         factory = await ethers.getContractFactory("LowSodiumWallet");
-        [owner, bobby, alice, ...addrs] = await ethers.getSigners();
+        [owner, bobby, alice, james, ...addrs] = await ethers.getSigners();
     });
 
     this.beforeEach(async function() {
