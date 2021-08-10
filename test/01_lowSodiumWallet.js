@@ -44,6 +44,9 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
             await contract6.orderTransaction(addressZero, tenMillionGwei, bobby.address);
         }
 
+        contract2.nextId = 1;
+        contract6.nextId = 1;
+
         // Wait(4 sec)
         await new Promise(resolve => {
             setTimeout(resolve, 4000);
@@ -135,31 +138,60 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
         
         it("Succesful ammendment under regular conditions - ammend", async () => {
             
-            
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            var block = await ethers.provider.getBlock();
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
 
+            response = await contract.ammendDestination(id, alice.address);
+            response = await response.wait();
+            event = response.events[0].args;
+            
+            expect(event.destination).to.be.equal(alice.address);
+            expect(event.ID).to.be.equal(id);
+
+            expect(event.owner).to.be.equal(owner.address);
+            expect(event.maturity).to.be.equal(block.timestamp + 86400);
+            expect(event.token).to.be.equal(addressZero);
+            expect(event.amount).to.be.equal(tenMillionGwei);
         });
 
         it("Fails when called by someone other than the owner - ammend", async () => {
             
-            
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+
+            await expect(contract.connect(bobby).ammendDestination(id, alice.address)).to.be.reverted;
+            await expect(contract.connect(alice).ammendDestination(id, alice.address)).to.be.reverted;
+            await expect(contract.connect(james).ammendDestination(id, alice.address)).to.be.reverted;
             
         });
 
         it("Fails when destination is the same as origin - ammend", async () => {
             
-            
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+
+            await expect(contract.ammendDestination(id, this.address)).to.be.reverted;
             
         });
 
         it("Fails if half mature - ammend", async () => {
             
-            
+            await expect(contract6.ammendDestination(contract6.nextId, bobby.address)).to.be.reverted;
+            contract6.nextId++;
 
         });
 
         it("Fails if mature - ammend", async () => {
             
-            
+            await expect(contract2.ammendDestination(contract2.nextId, bobby.address)).to.be.reverted;
+            contract2.nextId++;
 
         });
 
