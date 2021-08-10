@@ -5,7 +5,7 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
 
     var factory; // Contract deployer
     var owner, bobby, alice, james, addrs; // Different accounts provided by ethers
-    var contract, contract2, contract6; // Three contracts with a delay of 1 day and 2 and 6 seconds.
+    var contract, contract2, contract8; // Three contracts with a delay of 1 day and 2 and 6 seconds.
 
     /**
      *  1 and 0.01 eth in BigNumber format. This is an -ethers- quirk related to having ints that are 256bit.
@@ -18,9 +18,9 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
     /**
      *  We want to advance some transactions so that we can test cancel/ammend/finish behavior.
      *  It is better to wait here once than to wait everytime we need them.
-     *  We prepopulate contract2 and 6 with some orders, and we wait 4 seconds: 
+     *  We prepopulate contract2 and 8 with some orders, and we wait 4 seconds: 
      *  more than maturity for contract2, less (but more than half) for contract6
-     *  with a margin of 2 seconds either way.
+     *  with a margin of at least 2 seconds either way.
      */
     this.beforeAll(async function() {
 
@@ -33,19 +33,19 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
         contract2 = await factory.deploy(2);
         await owner.sendTransaction({ to: contract2.address, value: eth }); // Sending 1 eth to contract2
 
-        contract6 = await factory.deploy(6);
-        await owner.sendTransaction({ to: contract6.address, value: eth }); // Sending 1 eth to contract6
+        contract8 = await factory.deploy(8);
+        await owner.sendTransaction({ to: contract8.address, value: eth }); // Sending 1 eth to contract6
 
         // Prepopulation
         var am = 20;
         for(let i = 0; i < am; i++)
         {
             await contract2.orderTransaction(addressZero, tenMillionGwei, bobby.address);
-            await contract6.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            await contract8.orderTransaction(addressZero, tenMillionGwei, bobby.address);
         }
 
         contract2.nextId = 1;
-        contract6.nextId = 1;
+        contract8.nextId = 1;
 
         // Wait(4 sec)
         await new Promise(resolve => {
@@ -183,14 +183,81 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
 
         it("Fails if half mature - ammend", async () => {
             
-            await expect(contract6.ammendDestination(contract6.nextId, bobby.address)).to.be.reverted;
-            contract6.nextId++;
+            await expect(contract8.ammendDestination(contract8.nextId, bobby.address)).to.be.reverted;
+            contract8.nextId++;
 
         });
 
         it("Fails if mature - ammend", async () => {
             
             await expect(contract2.ammendDestination(contract2.nextId, bobby.address)).to.be.reverted;
+            contract2.nextId++;
+
+        });
+
+    });
+
+    describe("Cancel Transaction", async function() {
+        
+        it("Succesful canceling under regular conditions - cancel", async () => {
+            
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            var block = await ethers.provider.getBlock();
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+
+            response = await contract.cancelTransaction(id);
+            response = await response.wait();
+            event = response.events[0].args;
+            
+            expect(event.ID).to.be.equal(id);
+
+            expect(event.owner).to.be.equal(owner.address);
+            expect(event.maturity).to.be.equal(block.timestamp + 86400);
+            expect(event.token).to.be.equal(addressZero);
+            expect(event.amount).to.be.equal(tenMillionGwei);
+            expect(event.destination).to.be.equal(bobby.address);
+        });
+
+        it("Fails when called by someone other than the owner - cancel", async () => {
+            
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+
+            await expect(contract.connect(bobby).cancelTransaction(id)).to.be.reverted;
+            await expect(contract.connect(alice).cancelTransaction(id)).to.be.reverted;
+            await expect(contract.connect(james).cancelTransaction(id)).to.be.reverted;
+            
+        });
+
+        it("Does not change the balance of the account - cancel", async () => {
+            
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+
+            var balance = await ethers.provider.getBalance(contract.address);
+            await expect(contract.cancelTransaction(id)).to.not.be.reverted;
+            expect(await ethers.provider.getBalance(contract.address)).to.be.equal(balance);
+            
+        });
+
+        it("Does not fail if half mature - cancel", async () => {
+
+            var response = await contract8.cancelTransaction(contract8.nextId);
+            response = await response.wait();
+            var event = response.events[0].args;
+            contract8.nextId++;
+
+        });
+
+        it("Fails if mature - cancel", async () => {
+            
+            await expect(contract2.cancelTransaction(contract2.nextId)).to.be.reverted;
             contract2.nextId++;
 
         });
