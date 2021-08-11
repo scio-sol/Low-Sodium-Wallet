@@ -422,5 +422,3 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
     });
 
 });
-
-// TODO test interaction with a token
