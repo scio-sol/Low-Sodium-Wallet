@@ -8,49 +8,21 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
     var contract, contract2, contract8; // Three contracts with a delay of 1 day and 2 and 6 seconds.
 
     /**
-     *  1 and 0.01 eth in BigNumber format. This is an -ethers- quirk related to having ints that are 256bit.
+     *  10, 1 and 0.01 eth in BigNumber format. This is an -ethers.js- quirk related to having ints that are 256bit.
      *  Also, the address 0x0.
      */
-    var eth            = ethers.BigNumber.from("1000000000000000000");
+    var tenEther       = ethers.BigNumber.from("10000000000000000000");
+    var oneEther       = ethers.BigNumber.from("1000000000000000000");
     var tenMillionGwei = ethers.BigNumber.from("10000000000000000");
     var addressZero = ethers.constants.AddressZero;
 
-    /**
-     *  We want to advance some transactions so that we can test cancel/ammend/finish behavior.
-     *  It is better to wait here once than to wait everytime we need them.
-     *  We prepopulate contract2 and 8 with some orders, and we wait 4 seconds: 
-     *  more than maturity for contract2, less (but more than half) for contract6
-     *  with a margin of at least 2 seconds either way.
-     */
     this.beforeAll(async function() {
 
         factory = await ethers.getContractFactory("LowSodiumWallet");
         [owner, bobby, alice, james, ...addrs] = await ethers.getSigners();
-        contract = await factory.deploy(86400);
+        contract = await factory.deploy(86400); // One day to maturity
         
-        await owner.sendTransaction({ to: contract.address, value: eth.mul(10) }); // Sending 10 eth to contract
-
-        contract2 = await factory.deploy(2);
-        await owner.sendTransaction({ to: contract2.address, value: eth }); // Sending 1 eth to contract2
-
-        contract8 = await factory.deploy(8);
-        await owner.sendTransaction({ to: contract8.address, value: eth }); // Sending 1 eth to contract6
-
-        // Prepopulation
-        var am = 20;
-        for(let i = 0; i < am; i++)
-        {
-            await contract2.orderTransaction(addressZero, tenMillionGwei, bobby.address);
-            await contract8.orderTransaction(addressZero, tenMillionGwei, bobby.address);
-        }
-
-        contract2.nextId = 1;
-        contract8.nextId = 1;
-
-        // Wait(4 sec)
-        await new Promise(resolve => {
-            setTimeout(resolve, 4000);
-        });
+        await owner.sendTransaction({ to: contract.address, value: tenEther });
 
     });
 
@@ -76,16 +48,13 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
             await expect(contract.orderTransaction(addressZero, tenMillionGwei, bobby.address))
             .to.not.be.reverted;
 
-            var c = await factory.deploy(86400);
-            await owner.sendTransaction({ to: c.address, value: eth });
-            var res = await c.orderTransaction(addressZero, tenMillionGwei, bobby.address);
-            res = await res.wait();
-            expect(res.events.length).to.be.equal(1);
-            var event = res.events[0].args;
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
             var block = await ethers.provider.getBlock();
+            response = await response.wait();
+            var event = response.events[0].args;
             
             expect(event.owner).to.be.equal(owner.address);
-            expect(event.ID).to.be.equal(1);
+            expect(event.ID).to.not.be.equal(0);
             expect(event.maturity).to.be.equal(block.timestamp + 86400);
             expect(event.token).to.be.equal(addressZero);
             expect(event.amount).to.be.equal(tenMillionGwei);
@@ -112,7 +81,7 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
         it("Fails when not enough funds to fulfill - order", async () => {
             
             // We gave it 10 eth at the beginning, must have around 9.95 free. Now we ask for 100.
-            await expect(contract.orderTransaction(addressZero, eth.mul(100), bobby.address))
+            await expect(contract.orderTransaction(addressZero, tenEther.mul(10), bobby.address))
             .to.be.reverted;
 
             // We create a new contract with 0.1 eth and send half, try to send 0.07 to see it fail 
@@ -183,15 +152,29 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
 
         it("Fails if half mature - ammend", async () => {
             
-            await expect(contract8.ammendDestination(contract8.nextId, bobby.address)).to.be.reverted;
-            contract8.nextId++;
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+
+            /**
+             *  86400 seconds is 24 hours (tx maturity)
+             *  46800 seconds is 13 hours (more than half)
+             */
+            await network.provider.send("evm_increaseTime", [46800]);
+            await expect(contract.ammendDestination(id, alice.address)).to.be.reverted;
 
         });
 
         it("Fails if mature - ammend", async () => {
             
-            await expect(contract2.ammendDestination(contract2.nextId, bobby.address)).to.be.reverted;
-            contract2.nextId++;
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+
+            await network.provider.send("evm_increaseTime", [86401]);
+            await expect(contract.ammendDestination(id, alice.address)).to.be.reverted;
 
         });
 
@@ -248,21 +231,25 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
 
         it("Does not fail if half mature - cancel", async () => {
 
-            console.log(ethers.provider);
             var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
             response = await response.wait();
             var event = response.events[0].args;
             var id = event.ID;
 
-            await network.provider.send("evm_increaseTime", [60000]);
+            await network.provider.send("evm_increaseTime", [46800]);
             await expect(contract.cancelTransaction(id)).to.not.be.reverted;
 
         });
 
         it("Fails if mature - cancel", async () => {
             
-            await expect(contract2.cancelTransaction(contract2.nextId)).to.be.reverted;
-            contract2.nextId++;
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+
+            await network.provider.send("evm_increaseTime", [86401]);
+            await expect(contract.cancelTransaction(id)).to.be.reverted;
 
         });
 
