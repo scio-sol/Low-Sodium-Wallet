@@ -248,10 +248,14 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
 
         it("Does not fail if half mature - cancel", async () => {
 
-            var response = await contract8.cancelTransaction(contract8.nextId);
+            console.log(ethers.provider);
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
             response = await response.wait();
             var event = response.events[0].args;
-            contract8.nextId++;
+            var id = event.ID;
+
+            await network.provider.send("evm_increaseTime", [60000]);
+            await expect(contract.cancelTransaction(id)).to.not.be.reverted;
 
         });
 

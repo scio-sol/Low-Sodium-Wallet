@@ -133,7 +133,7 @@ contract LowSodiumWallet {
         PendingTransaction memory pt = pendingTransactions[_txId];
 
         // Check the timestamp. If id is not correct, maturity will be = 0 and it will revert.
-        require(pt.maturity > block.timestamp + delay/2);
+        require(pt.maturity > uint96(block.timestamp) + delay/2);
 
         pendingTransactions[_txId].destination = _destination;
 
