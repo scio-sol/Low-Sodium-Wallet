@@ -72,7 +72,6 @@ contract LowSodiumWallet {
 
     constructor(uint96 _delay) {
 
-        nonce = 0; // The first tx is #1 because the nonce pre-increments
         delay = _delay;
         owner = msg.sender;
 

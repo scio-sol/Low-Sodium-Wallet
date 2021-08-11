@@ -5,7 +5,7 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
 
     var factory; // Contract deployer
     var owner, bobby, alice, james, addrs; // Different accounts provided by ethers
-    var contract, contract2, contract8; // Three contracts with a delay of 1 day and 2 and 6 seconds.
+    var contract;
 
     /**
      *  10, 1 and 0.01 eth in BigNumber format. This is an -ethers.js- quirk related to having ints that are 256bit.
@@ -178,6 +178,18 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
 
         });
 
+        it("Fails if id does not exist - ammend", async () => {
+            
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+            id += 100;
+
+            await expect(contract.ammendDestination(id, alice.address)).to.be.reverted;
+
+        });
+
     });
 
     describe("Cancel Transaction", async function() {
@@ -253,6 +265,107 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
 
         });
 
+        it("Fails if id does not exist - cancel", async () => {
+            
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+            id += 100;
+
+            await expect(contract.cancelTransaction(id)).to.be.reverted;
+
+        });
+
+    });
+
+    describe("Finish Transaction", async function() {
+        
+        it("Succesful finishing under regular conditions - finish", async () => {
+            
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            var block = await ethers.provider.getBlock();
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+
+            await network.provider.send("evm_increaseTime", [86401]);
+            response = await contract.finishTransaction(id);
+            response = await response.wait();
+            event = response.events[0].args;
+            
+            expect(event.ID).to.be.equal(id);
+
+            expect(event.owner).to.be.equal(owner.address);
+            expect(event.maturity).to.be.equal(block.timestamp + 86400);
+            expect(event.token).to.be.equal(addressZero);
+            expect(event.amount).to.be.equal(tenMillionGwei);
+            expect(event.destination).to.be.equal(bobby.address);
+        });
+
+        it("Success when called by someone other than the owner - finish", async () => {
+            
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+            response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            event = response.events[0].args;
+            var id2 = event.ID;
+            response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            event = response.events[0].args;
+            var id3 = event.ID;
+
+            await network.provider.send("evm_increaseTime", [86401]);
+            await expect(contract.connect(bobby).finishTransaction(id)).to.not.be.reverted;
+            await expect(contract.connect(alice).finishTransaction(id2)).to.not.be.reverted;
+            await expect(contract.connect(james).finishTransaction(id3)).to.not.be.reverted;
+            
+        });
+
+        it("Changes the balance of the account - finish", async () => {
+            
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+
+            var balance = await ethers.provider.getBalance(contract.address);
+            await network.provider.send("evm_increaseTime", [86401]);
+            await expect(contract.finishTransaction(id)).to.not.be.reverted;
+            expect(await ethers.provider.getBalance(contract.address)).to.be.equal(balance.sub(tenMillionGwei));
+            
+        });
+
+        it("Fails if half mature - finish", async () => {
+
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+
+            await network.provider.send("evm_increaseTime", [46800]);
+            await expect(contract.finishTransaction(id)).to.be.reverted;
+
+        });
+
+        it("Fails if id does not exist - finish", async () => {
+            
+            var response = await contract.orderTransaction(addressZero, tenMillionGwei, bobby.address);
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+            id += 100;
+
+            await network.provider.send("evm_increaseTime", [86401]);
+            await expect(contract.finishTransaction(id)).to.be.reverted;
+
+        });
+
     });
 
 });
+
+// TODO test interaction with a token
