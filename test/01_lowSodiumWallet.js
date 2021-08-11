@@ -101,6 +101,26 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
 
         });
 
+        it("Testing that it works with ERC20 tokens - order", async () => {
+            
+            // First we create the coin
+            var factoryERC20 = await ethers.getContractFactory("TestERC20");
+            var token = await factoryERC20.deploy(
+                "BigBadBubblegum", // Name
+                "BBB", // Symbol
+                1000, // Initial amount per initial holder
+                [owner.address, bobby.address, alice.address, james.address, contract.address] // List of holders
+            );
+            expect(await token.balanceOf(contract.address)).to.be.equal(1000);
+
+            // Second we try to send some money to bobby and to the owner.
+            await expect(contract.orderTransaction(token.address, 10, owner.address)).to.not.be.reverted;
+            await expect(contract.orderTransaction(token.address, 10, bobby.address)).to.not.be.reverted;
+            // Reverts because not enough non-reserved funds
+            await expect(contract.orderTransaction(token.address, 981, bobby.address)).to.be.reverted;
+
+        });
+
     });
 
     describe("Ammend destination", async function() {
@@ -361,6 +381,41 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
 
             await network.provider.send("evm_increaseTime", [86401]);
             await expect(contract.finishTransaction(id)).to.be.reverted;
+
+        });
+
+        it("Testing that it works with ERC20 tokens - finish", async () => {
+            
+            // First we create the coin
+            var factoryERC20 = await ethers.getContractFactory("TestERC20");
+            var token = await factoryERC20.deploy(
+                "BigBadBubblegum", // Name
+                "BBB", // Symbol
+                1000, // Initial amount per initial holder
+                [owner.address, bobby.address, alice.address, james.address, contract.address] // List of holders
+            );
+            expect(await token.balanceOf(contract.address)).to.be.equal(1000);
+
+            // Second we try to send some money to bobby.
+            var response = await expect(contract.orderTransaction(token.address, 10, bobby.address)).to.not.be.reverted;
+            response = await response.wait();
+            var event = response.events[0].args;
+            var id = event.ID;
+
+            // Oops, we wanted to send it to alice instead.
+            await expect(contract.ammendDestination(id, alice.address)).to.not.be.reverted;
+
+            // Now we wait one day and one second for the transaction to mature
+            await network.provider.send("evm_increaseTime", [86401]);
+
+            // Check the balances before and after the txs.
+            var walletBeforeTx = await token.balanceOf(contract.address);
+            var aliceBeforeTx = await token.balanceOf(alice.address);
+
+            await expect(contract.finishTransaction(id)).to.not.be.reverted;
+
+            expect(await token.balanceOf(contract.address)).to.be.equal(walletBeforeTx.sub(10));
+            expect(await token.balanceOf(alice.address)).to.be.equal(aliceBeforeTx.add(10));
 
         });
 
