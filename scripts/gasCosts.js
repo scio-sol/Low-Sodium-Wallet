@@ -51,8 +51,9 @@ async function main() {
     block = await ethers.provider.getBlock();
     costOfFinish = block.gasUsed;
 
+    console.log();
     console.log("Action | Gas Cost | Eth Cost(approx. 50Gwei) | $ (at 2000$/eth");
-    console.log("Deploy |" + costOfDeployment.toString() + "   | " + costOfDeployment.toNumber()/(20 * 10 ** 6) + "                | " + costOfDeployment.toNumber()/(10 ** 4));
+    console.log("Deploy |" + costOfDeployment.toString() + "   | " + costOfDeployment.toNumber()/(20 * 10 ** 6) + "               | " + costOfDeployment.toNumber()/(10 ** 4));
     console.log("Start  |" + costOfTransaction.toString() + "    | " + costOfTransaction.toNumber()/(20 * 10 ** 6) + "                | " + costOfTransaction.toNumber()/(10 ** 4));
     console.log("Ammend |" + costOfAmmendment.toString() + "     | " + costOfAmmendment.toNumber()/(20 * 10 ** 6) + "                | " + costOfAmmendment.toNumber()/(10 ** 4));
     console.log("Cancel |" + costOfCancel.toString() + "     | " + costOfCancel.toNumber()/(20 * 10 ** 6) + "               | " + costOfCancel.toNumber()/(10 ** 4));
