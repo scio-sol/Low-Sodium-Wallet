@@ -79,6 +79,9 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
         });
 
         it("Fails when not enough funds to fulfill - order", async () => {
+            var pointone = tenMillionGwei.mul(10);
+            var pointzerofive = tenMillionGwei.mul(5);
+            var pointzeroseven = tenMillionGwei.mul(7);
             
             // We gave it 10 eth at the beginning, must have around 9.95 free. Now we ask for 100.
             await expect(contract.orderTransaction(addressZero, tenEther.mul(10), bobby.address))
@@ -86,12 +89,9 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
 
             // We create a new contract with 0.1 eth and send half, try to send 0.07 to see it fail 
             // because too much money is reserved while balance is still 0.1
-            var c = await factory.deploy(86400);
-            await owner.sendTransaction({ to: c.address, value: tenMillionGwei.mul(10) });
 
-            var pointone = tenMillionGwei.mul(10);
-            var pointzerofive = tenMillionGwei.mul(5);
-            var pointzeroseven = tenMillionGwei.mul(7);
+            var c = await factory.deploy(86400);
+            await owner.sendTransaction({ to: c.address, value: pointone });
 
             expect(await ethers.provider.getBalance(c.address)).to.be.equal(pointone);
             await expect(c.orderTransaction(addressZero, pointzerofive, bobby.address)).to.not.be.reverted;
@@ -118,6 +118,7 @@ describe("Low Sodium Wallet - Unit Tests", async function() {
             await expect(contract.orderTransaction(token.address, 10, bobby.address)).to.not.be.reverted;
             // Reverts because not enough non-reserved funds
             await expect(contract.orderTransaction(token.address, 981, bobby.address)).to.be.reverted;
+            expect(await token.balanceOf(contract.address)).to.be.equal(1000);
 
         });
 
